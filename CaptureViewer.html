@@ -1,0 +1,518 @@
+<html>
+<head>
+	<title>bookmarklet</title>
+	<meta charset="utf-8">
+	<style>
+		* { 
+			font-family : NanumGothic,나눔고딕,Gulim; 
+			font-size : 10pt;	
+		}
+	</style>
+</head>
+<body>
+
+<br>
+
+<a href="javascript:(function() {	
+
+
+	var currentUrl = window.location.href,
+		idx = 0,
+		parentUrl = '',
+		selectorString = 'div.fl h2',
+		frameWidth = 800,
+		clickedUrl = '';
+
+	window.imgHashMap = {};
+
+	if (currentUrl.indexOf('p_120424_london') == -1) {
+		selectorString = 'h2';
+		frameWidth = 340;
+	}
+
+	if (window.jQuery === undefined) {
+		var script = document.createElement('script');
+		script.src = 'http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js';
+		script.type = 'text/javascript';
+		script.onload = script.onreadystatechange = function(){
+			if (!this.readyState || this.readyState == 'loaded' || this.readyState == 'complete') {
+				makeViewer(selectorString, frameWidth);
+			}
+		};
+		document.getElementsByTagName('head')[0].appendChild(script);
+	} else {
+		makeViewer(selectorString, frameWidth);
+	}
+
+	if (parentUrl.length == 0) {
+		idx = currentUrl.search(/.html/i);
+		if (idx != -1) {
+			idx = currentUrl.lastIndexOf('/');			
+			parentUrl = currentUrl.substring(0, idx + 1);			
+		}
+	}
+
+	function createCORS() {
+		var xhr;
+
+		if (typeof XMLHttpRequest !== undefined) {
+			xhr = new XMLHttpRequest();
+			if ('withCredentials' in xhr) {
+				return xhr;
+			}
+		}
+
+		if (typeof XDomainRequest !== undefined) {
+			return new XDomainRequest();
+		}
+		return null;
+	}
+
+	function runTestFromServer(browser, element) {
+
+		var cors = createCORS(),
+			capturedSrc = '',
+			clickedPage = {};
+
+		clickedPage = imgHashMap[clickedUrl];
+		if (clickedPage) {
+			capturedSrc = clickedPage[browser];
+			if (capturedSrc) {				
+				return capturedSrc;
+			}
+		}
+		
+		cors.onload = function() {
+			var capturedImgUrl = cors.responseText;
+			console.log('success : ' + capturedImgUrl);
+
+			if (capturedImgUrl.length != 0) {					
+				clickedPage = imgHashMap[clickedUrl];
+				if (clickedPage) {
+					clickedPage[browser] = capturedImgUrl;	
+				}
+				else {
+					imgHashMap[clickedUrl] = {};
+					imgHashMap[clickedUrl][browser] = capturedImgUrl;				
+				}	
+				$(element).css('background', '#8DDA88');							
+			}
+		};
+		cors.onerror = function() {
+			console.log('error');		
+			$(element).css('background', '#FC9191');	
+		};
+
+		cors.open('POST', 'http:// - capture service', true);
+		cors.setRequestHeader('Content-Type', 'text/plain');				
+		cors.send(parentUrl + clickedUrl + ',' + browser);	
+		
+	}
+
+	function makeViewer(ss, ww) {
+		$(ss).click(function() {
+			var title = $(this),
+				conDiv = $('<div class=\'cDiv\'/>'),
+				navDiv = $('<div class=\'nDiv\'/>'),
+				browserDiv = $('<div class=\'bDiv\'/>'),
+				viewDiv = $('<div class=\'vDiv\'/>'),
+				body = $('body'),
+				iframe = $('<iframe id=\'view\' width=\'' + ww + 'px\' height=\'1000px\' scrolling=\'yes\'/>'),
+				list = title.next('ul').children('li'),
+				mainDiv = $('<div>').css('text-align', 'right'),
+				toMainLink = $('<a>').attr('href', currentUrl).text('main'),
+				imageUrl = 'http:// - image directory';
+				
+			body.empty(); 
+
+			body.append(conDiv); 
+
+			conDiv.append(navDiv);
+
+			mainDiv.append(toMainLink);
+			navDiv.append(mainDiv);
+			navDiv.append(title);
+			navDiv.append(list);
+
+			browserDiv.append('<div id=\'ie7\' style=\'color:#FFA94C;font-weight:bold\' color=\'#FFA94C\'>ie7</div>');
+			browserDiv.append('<div id=\'ie8\' style=\'color:#29A9FA;font-weight:bold\' color=\'#29A9FA\'>ie8</div>');
+			browserDiv.append('<div id=\'ie9\' style=\'color:#B329FA;font-weight:bold\' color=\'#B329FA\'>ie9</div>');
+			browserDiv.append('<div id=\'firefox\' style=\'color:#B3060A;font-weight:bold\' color=\'#B3060A\'>firefox</div>');
+			browserDiv.append('<div id=\'chrome\' style=\'color:#000000;font-weight:bold\' color=\'#000000\'>chrome</div>');
+
+			conDiv.append(browserDiv);
+
+			conDiv.append(viewDiv);
+			viewDiv.append(iframe);
+
+			$('div.bDiv').on('mouseover', 'div', function() {
+				$(this).css('cursor', 'pointer');
+			});
+
+			$('a').click(function() {
+				var anchorNode = $(this),
+					url = anchorNode.attr('url'),
+					imgFileName = '',
+					browserButtons = $('div.bDiv div');
+
+				browserButtons.each(function() { 
+					var btn = $(this);
+					btn.css('background', 'white');	
+				});
+
+				$('div.vDiv').css('border', '3px solid #FFFFFF');
+
+
+				if (anchorNode.text() == 'main') {
+					location.reload(true);
+					return;
+				}
+
+				if (!url) {
+					url = anchorNode.attr('href');
+					anchorNode.removeAttr('href');
+					anchorNode.attr('url', url);
+				}
+
+				$('#view').attr('src', url);
+
+				$('li').css('background', 'white');
+				anchorNode.parent('li').css('background', '#BADAFF');
+
+				clickedUrl = url;
+
+				browserButtons.each(function() { 
+					var bName = $(this).attr('id'),						
+						that = {};
+
+					that = $(this);
+					runTestFromServer(bName, that);
+				});
+					
+			});
+
+			$('div.bDiv').on('click', 'div', function() {			
+				var div = $(this),
+					browser = div.attr('id'),
+					capturedSrc = '',
+					color = '',
+					src = '';
+
+				capturedSrc = runTestFromServer(browser);
+				$('#view').attr('src', capturedSrc);				
+
+				src = $('#view').attr('src');
+				if (src.indexOf(browser) != -1) {
+					color = div.attr('color');
+					$('div.vDiv').css('border', '3px solid ' + color);
+				}
+			});
+
+			$('div.cDiv').css('width', '1100px');
+			$('div.nDiv').css('width', '200px');
+			$('div.vDiv').css('width', '800px');
+
+			$('div.bDiv').css('float', 'left');
+			$('div.bDiv').css('border', '1px solid #999');
+			$('div.bDiv').css('margin-left', '10px');
+			$('div.bDiv').css('padding', '5px');
+			$('div.bDiv').css('font-size', '13pt');
+
+			$('div.nDiv').css('float', 'left');
+			$('div.vDiv').css('float', 'left');
+		});
+	}
+
+})();">CaptureViewer</a>
+
+
+
+
+
+<script type="text/javascript">
+
+function crossview() {	
+
+	var currentUrl = window.location.href,
+		idx = 0,
+		parentUrl = '',
+		selectorString = 'div.fl h2',
+		frameWidth = 800,
+		clickedUrl = '';
+
+	window.imgHashMap = {};
+
+	if (currentUrl.indexOf('p_120424_london') == -1) {
+		selectorString = 'h2';
+		frameWidth = 340;
+	}
+
+	if (window.jQuery === undefined) {
+		var script = document.createElement('script');
+		script.src = 'http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js';
+		script.type = 'text/javascript';
+		script.onload = script.onreadystatechange = function(){
+			if (!this.readyState || this.readyState == 'loaded' || this.readyState == 'complete') {
+				makeViewer(selectorString, frameWidth);
+			}
+		};
+		document.getElementsByTagName('head')[0].appendChild(script);
+	} else {
+		makeViewer(selectorString, frameWidth);
+	}
+
+	if (parentUrl.length == 0) {
+		idx = currentUrl.search(/.html/i);
+		if (idx != -1) {
+			idx = currentUrl.lastIndexOf('/');			
+			parentUrl = currentUrl.substring(0, idx + 1);			
+		}
+	}
+
+	function createCORS() {
+		var xhr;
+
+		if (typeof XMLHttpRequest !== undefined) {
+			xhr = new XMLHttpRequest();
+			if ('withCredentials' in xhr) {
+				return xhr;
+			}
+		}
+
+		if (typeof XDomainRequest !== undefined) {
+			return new XDomainRequest();
+		}
+		return null;
+	}
+
+	function runTestFromServer(browser, element) {
+
+		var cors = createCORS(),
+			capturedSrc = '',
+			clickedPage = {};
+
+		clickedPage = imgHashMap[clickedUrl];
+		if (clickedPage) {
+			capturedSrc = clickedPage[browser];
+			if (capturedSrc) {				
+				return capturedSrc;
+			}
+		}
+		
+		cors.onload = function() {
+			var capturedImgUrl = cors.responseText;
+			console.log('success : ' + capturedImgUrl);
+
+			if (capturedImgUrl.length != 0) {					
+				clickedPage = imgHashMap[clickedUrl];
+				if (clickedPage) {
+					clickedPage[browser] = capturedImgUrl;	
+				}
+				else {
+					imgHashMap[clickedUrl] = {};
+					imgHashMap[clickedUrl][browser] = capturedImgUrl;				
+				}	
+				$(element).css('background', '#8DDA88');							
+			}
+		};
+		cors.onerror = function() {
+			console.log('error');		
+			$(element).css('background', '#FC9191');	
+		};
+
+		cors.open('POST', 'http:// - capture service', true);
+		cors.setRequestHeader('Content-Type', 'text/plain');				
+		cors.send(parentUrl + clickedUrl + ',' + browser);	
+		
+	}
+
+	function makeViewer(ss, ww) {
+		$(ss).click(function() {
+			var title = $(this),
+				conDiv = $('<div class=\'cDiv\'/>'),
+				navDiv = $('<div class=\'nDiv\'/>'),
+				browserDiv = $('<div class=\'bDiv\'/>'),
+				viewDiv = $('<div class=\'vDiv\'/>'),
+				body = $('body'),
+				iframe = $('<iframe id=\'view\' width=\'' + ww + 'px\' height=\'1000px\' scrolling=\'yes\'/>'),
+				list = title.next('ul').children('li'),
+				mainDiv = $('<div>').css('text-align', 'right'),
+				toMainLink = $('<a>').attr('href', currentUrl).text('main'),
+				imageUrl = 'http:// - image directory';
+				
+			body.empty(); 
+
+			body.append(conDiv); 
+
+			conDiv.append(navDiv);
+
+			mainDiv.append(toMainLink);
+			navDiv.append(mainDiv);
+			navDiv.append(title);
+			navDiv.append(list);
+
+			browserDiv.append('<div id=\'ie7\' style=\'color:#FFA94C;font-weight:bold\' color=\'#FFA94C\'>ie7</div>');
+			browserDiv.append('<div id=\'ie8\' style=\'color:#29A9FA;font-weight:bold\' color=\'#29A9FA\'>ie8</div>');
+			browserDiv.append('<div id=\'ie9\' style=\'color:#B329FA;font-weight:bold\' color=\'#B329FA\'>ie9</div>');
+			browserDiv.append('<div id=\'firefox\' style=\'color:#B3060A;font-weight:bold\' color=\'#B3060A\'>firefox</div>');
+			browserDiv.append('<div id=\'chrome\' style=\'color:#000000;font-weight:bold\' color=\'#000000\'>chrome</div>');
+
+			conDiv.append(browserDiv);
+
+			conDiv.append(viewDiv);
+			viewDiv.append(iframe);
+
+			$('div.bDiv').on('mouseover', 'div', function() {
+				$(this).css('cursor', 'pointer');
+			});
+
+			$('a').click(function() {
+				var anchorNode = $(this),
+					url = anchorNode.attr('url'),
+					imgFileName = '',
+					browserButtons = $('div.bDiv div');
+
+				browserButtons.each(function() { 
+					var btn = $(this);
+					btn.css('background', 'white');	
+				});
+
+				$('div.vDiv').css('border', '3px solid #FFFFFF');
+
+
+				if (anchorNode.text() == 'main') {
+					location.reload(true);
+					return;
+				}
+
+				if (!url) {
+					url = anchorNode.attr('href');
+					anchorNode.removeAttr('href');
+					anchorNode.attr('url', url);
+				}
+
+				$('#view').attr('src', url);
+
+				$('li').css('background', 'white');
+				anchorNode.parent('li').css('background', '#BADAFF');
+
+				clickedUrl = url;
+
+				browserButtons.each(function() { 
+					var bName = $(this).attr('id'),						
+						that = {};
+
+					that = $(this);
+					runTestFromServer(bName, that);
+				});
+					
+			});
+
+			$('div.bDiv').on('click', 'div', function() {			
+				var div = $(this),
+					browser = div.attr('id'),
+					capturedSrc = '',
+					color = '',
+					src = '';
+
+				capturedSrc = runTestFromServer(browser);
+				$('#view').attr('src', capturedSrc);				
+
+				src = $('#view').attr('src');
+				if (src.indexOf(browser) != -1) {
+					color = div.attr('color');
+					$('div.vDiv').css('border', '3px solid ' + color);
+				}
+			});
+
+			$('div.cDiv').css('width', '1100px');
+			$('div.nDiv').css('width', '200px');
+			$('div.vDiv').css('width', '800px');
+
+			$('div.bDiv').css('float', 'left');
+			$('div.bDiv').css('border', '1px solid #999');
+			$('div.bDiv').css('margin-left', '10px');
+			$('div.bDiv').css('padding', '5px');
+			$('div.bDiv').css('font-size', '13pt');
+
+			$('div.nDiv').css('float', 'left');
+			$('div.vDiv').css('float', 'left');
+		});
+	}
+
+}
+
+</script>
+
+<!--
+
+				// page move							
+				setTimeout(function() {
+					var iframeContents = $('#view').contents(),
+						topHeight = 0;
+					if (ww == 800) {	
+						topHeight = iframeContents.find('div.content_search').offset().top;
+						iframeContents.find('html, body').animate({scrollLeft:100}, 'fastest');
+					}
+					else {
+						topHeight = iframeContents.find('div.sc').offset().top;					
+					}
+					iframeContents.find('html, body').animate({scrollTop:topHeight}, 'fastest');	
+				}, 1000);
+
+
+
+				// ppt spec image view
+				imgFileName = url.replace('.html', '.jpg');
+
+				var specImgNode = $('img#specImg');
+
+				if (specImgNode.size() != 0) {
+					specImgNode.attr('src',  imageUrl + imgFileName);
+				}
+				else {					
+					$('<div>').attr('id', 'specDiv').appendTo('div.cDiv');
+					$('<img>').attr('id', 'specImg').attr('src', imageUrl + imgFileName).appendTo('div#specDiv');			
+
+					$('div.vDiv').css('background', 'white');
+					$('div#specDiv').css('background', 'white');
+					
+					specImgNode = $('img#specImg');
+					specImgNode.css('border', '10px solid #999');
+
+					$('div.vDiv').css({'position' : 'absolute', 'z-index' : 1, 'top' : 0, 'left' : 200});
+					specImgNode.css({'position' : 'absolute', 'z-index' : -1, 'top' : 0, 'left' : 350});
+					
+					specImgNode.attr('pin', 'off');
+					
+					specImgNode.on({
+						'click' : function() {							
+							var pin = specImgNode.attr('pin');
+
+							if (pin == 'off') {
+								specImgNode.css('z-index', 2);
+								specImgNode.attr('pin', 'on');
+							}
+							else {
+								specImgNode.css('z-index', -1);
+								specImgNode.attr('pin', 'off');	
+							}
+						},
+						'mouseover' : function() {
+							specImgNode.css('z-index', 2);
+						},
+						'mouseout' : function() {
+							var pin = specImgNode.attr('pin');
+							if (!pin || pin == 'off') {
+								specImgNode.css('z-index', -1);
+							}						
+						}
+					});
+
+
+				}				
+
+-->
+
+</body>
+</html>
